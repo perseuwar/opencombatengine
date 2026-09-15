@@ -260,6 +260,34 @@ namespace OpenCombatEngine.Implementation.Tests.CharacterCreation
         }
 
         [Fact]
+        public void AbilityMethod_Random4d6DropLowest_DuplicateNonMinimumValue_StillDropsTheRealMinimum()
+        {
+            // Prompted by a live player report that turned out to be a
+            // misread, not a bug here: a "12" total looked wrong for a
+            // roll the player remembered as [6, 4, 4, 2] (should drop to
+            // 14) — the actual roll was [6, 1, 4, 2] (drop to 12, correct),
+            // and the dropped die's own faint, struck-through "1" got
+            // misread as "4" (see the .roll-die.dropped CSS fix in
+            // Layforge's style.css). Keeping this case anyway: a duplicate
+            // value elsewhere in the set (two 4's here) must never distract
+            // IndexOf(lowest) from the real minimum.
+            var roller = FixedD6Rolls(new[] { 6, 4, 4, 2 });
+            var service = NewService(out _, roller);
+            service.Start("repro-session", CharacterCreationMode.Detailed, "Kestrel");
+            service.Answer("repro-session", "Human");
+            service.Answer("repro-session", "Fighter");
+            service.Answer("repro-session", "Male");
+            service.Answer("repro-session", "Soldier");
+
+            var prompt = service.Answer("repro-session", "random_4d6_drop_lowest");
+
+            var set = prompt.AbilityScoreRolls!.First();
+            set.Dice.Select(d => (d.Value, d.Dropped)).Should().Equal(
+                (6, false), (4, false), (4, false), (2, true));
+            set.Total.Should().Be(14);
+        }
+
+        [Fact]
         public void AbilityMethod_Random4d6DropLowest_AckAdvancesToByAbilityAssignmentPrompt()
         {
             var roller = FixedD6Rolls(
